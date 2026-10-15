@@ -1,13 +1,16 @@
 import { defineConfig, type Connect, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { createEdgeInspectHandler } from './server/edge.js';
+import { inspectUrl } from './server/inspect.js';
 import { toNodeHandler } from './server/nodeAdapter.js';
+import { createWebInspectHandler } from './server/webHandler.js';
 
 /**
  * Serves /api/inspect during `vite dev` and `vite preview` with the same
- * Web-standard handler that Cloudflare Pages runs (functions/api/inspect.ts).
+ * handler the Netlify Function runs (netlify/functions/inspect.ts).
  */
-export function inspectApi(handle: (request: Request) => Promise<Response> = createEdgeInspectHandler()): Plugin {
+export function inspectApi(
+  handle: (request: Request) => Promise<Response> = createWebInspectHandler((target, ancestor) => inspectUrl(target, ancestor)),
+): Plugin {
   const handler = toNodeHandler(handle);
   const mount = (middlewares: Connect.Server) =>
     middlewares.use('/api/inspect', (req, res) => {

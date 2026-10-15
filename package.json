@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "A dark, tabbed browser workspace that embeds websites that permit framing. Deploys to Cloudflare Pages (static site + Pages Function).",
+  "description": "A dark, tabbed browser workspace that embeds websites that permit framing. Deploys to Netlify (static site + Netlify Functions).",
   "engines": {
     "node": "22.x"
   },
@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "cf:dev": "npm run build && wrangler pages dev --port 8788",
-    "cf:check": "wrangler pages functions build --outdir=.wrangler/functions-check --compatibility-date=2026-10-01 --compatibility-flags=nodejs_compat"
+    "cf:check": "wrangler pages functions build --outdir=.wrangler/functions-check --compatibility-date=2026-10-01 --compatibility-flags=nodejs_compat",
+    "netlify:check": "npx -y netlify-cli@27.12.1 build --offline"
   },
   "dependencies": {
     "ipaddr.js": "^2.5.0",

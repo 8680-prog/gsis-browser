@@ -1,0 +1,12 @@
+# Netlify configuration (site: gsis). The dashboard settings should match these.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  # /api/inspect and the /api/* 404 live here; routes come from each file's `config.path`.
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

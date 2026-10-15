@@ -7,3 +7,6 @@ playwright-report
 .env*
 !.env.example
 .wrangler
+
+# Local Netlify folder
+.netlify

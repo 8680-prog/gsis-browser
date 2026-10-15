@@ -4,11 +4,8 @@ import {
   ACCEPT_HEADER,
   DEFAULT_LIMITS,
   InspectError,
-  JSON_HEADERS,
   MESSAGES,
   USER_AGENT,
-  checkInspectRequest,
-  createRateLimiter,
   decodeBody,
   describeResponse,
   extractTitle,
@@ -18,6 +15,7 @@ import {
   wantsTitle,
   type InspectResult,
 } from './core.js';
+import { createWebInspectHandler } from './webHandler.js';
 
 /**
  * Web-standard embed inspector for Cloudflare Pages Functions (Workers
@@ -197,30 +195,7 @@ export async function inspectUrlEdge(rawUrl: string, ancestorOrigin: string, pol
   }
 }
 
-function json(status: number, body: unknown, extraHeaders: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...JSON_HEADERS, ...extraHeaders } });
-}
-
-/** GET /api/inspect handler using the Web Request/Response API (Cloudflare Pages Functions). */
+/** GET /api/inspect handler for Cloudflare Pages Functions (Workers runtime). */
 export function createEdgeInspectHandler(policy: EdgePolicy = DEFAULT_EDGE_POLICY) {
-  const isLimited = createRateLimiter();
-
-  return async function handle(request: Request): Promise<Response> {
-    const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-    const check = checkInspectRequest({
-      method: request.method,
-      url: request.url,
-      secFetchSite: request.headers.get('sec-fetch-site'),
-      // Cloudflare sets cf-connecting-ip to the real client address.
-      clientKey: request.headers.get('cf-connecting-ip') || forwarded || 'unknown',
-      fallbackOrigin: new URL(request.url).origin,
-      isLimited,
-    });
-    if (!check.ok) return json(check.status, { error: check.error }, check.headers);
-    try {
-      return json(200, await inspectUrlEdge(check.target, check.ancestor, policy));
-    } catch {
-      return json(500, { error: 'Inspection failed unexpectedly' });
-    }
-  };
+  return createWebInspectHandler((target, ancestor) => inspectUrlEdge(target, ancestor, policy));
 }

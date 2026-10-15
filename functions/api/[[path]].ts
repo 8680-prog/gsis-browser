@@ -1,10 +1,8 @@
+import { apiNotFound } from '../../server/webHandler.js';
+
 /**
- * Catch-all for unknown /api/* routes. Without it, Cloudflare Pages would fall
- * back to the single-page app's index.html (HTTP 200), hiding API mistakes.
+ * Cloudflare Pages: catch-all for unknown /api/* routes. Without it, Pages would
+ * fall back to the single-page app's index.html (HTTP 200), hiding API mistakes.
  * More specific routes such as functions/api/inspect.ts take precedence.
  */
-export const onRequest = (): Response =>
-  new Response(JSON.stringify({ error: 'Not found' }), {
-    status: 404,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' },
-  });
+export const onRequest = (): Response => apiNotFound();
