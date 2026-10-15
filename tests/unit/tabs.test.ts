@@ -47,6 +47,29 @@ describe('tabsReducer', () => {
     expect(s.tabs[0].loadId).toBe(afterNav + 1);
   });
 
+  it('re-entering the current address reloads instead of adding a duplicate entry', () => {
+    let s = start(HOME);
+    const id = s.tabs[0].id;
+    s = tabsReducer(s, { type: 'navigate', id, url: 'https://a.example/' });
+    const loadId = s.tabs[0].loadId;
+    s = tabsReducer(s, { type: 'navigate', id, url: 'https://a.example/' });
+    expect(s.tabs[0].history).toEqual([HOME, 'https://a.example/']);
+    expect(s.tabs[0].loadId).toBe(loadId + 1);
+  });
+
+  it('a link followed inside the page drops forward entries but keeps back entries', () => {
+    let s = start(HOME);
+    const id = s.tabs[0].id;
+    s = tabsReducer(s, { type: 'navigate', id, url: 'https://a.example/' });
+    s = tabsReducer(s, { type: 'navigate', id, url: 'https://b.example/' });
+    s = tabsReducer(s, { type: 'back', id });
+    const loadId = s.tabs[0].loadId;
+    s = tabsReducer(s, { type: 'frameNavigated', id });
+    expect(s.tabs[0].history).toEqual([HOME, 'https://a.example/']);
+    expect(s.tabs[0].index).toBe(1);
+    expect(s.tabs[0].loadId).toBe(loadId); // the frame is not remounted
+  });
+
   it('selects a sensible tab when closing', () => {
     let s = start('https://1.example/', 'https://2.example/', 'https://3.example/');
     const [t1, t2, t3] = s.tabs;

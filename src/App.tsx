@@ -9,6 +9,15 @@ import { BookmarksPage, HistoryPage } from './pages/ListPages';
 import { CatalogPage } from './pages/CatalogPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { DEFAULT_SHORTCUTS } from './lib/catalog';
+import {
+  EMPTY_FRAME_HISTORY,
+  canFrameGoBack,
+  canFrameGoForward,
+  frameBack,
+  frameDepth,
+  frameForward,
+  recordFrameNavigation,
+} from './lib/frameHistory';
 import { clearInspectCache } from './lib/inspect';
 import { SEARCH_ENGINES, searchTemplateFor } from './lib/search';
 import { createId, readJson, usePersistentState, writeJson } from './lib/storage';
@@ -25,6 +34,16 @@ const KEYS = {
 };
 
 const MAX_HISTORY = 500;
+
+/** Keeps iframe names unique across reloads of Fern itself. */
+const SESSION_NONCE = Math.random().toString(36).slice(2, 8);
+/** A traversal whose frame load never arrives is forgotten after this long. */
+const TRAVERSAL_TIMEOUT_MS = 5000;
+
+/** Identifies one iframe mount: a new Fern navigation or reload is a new mount. */
+function mountKey(tab: Tab): string {
+  return `${tab.id}:${tab.loadId}`;
+}
 
 const DEFAULT_SETTINGS: Settings = {
   theme: 'fern',
@@ -91,10 +110,16 @@ export default function App() {
   const [state, dispatch] = useReducer(tabsReducer, settings, initialTabs);
   const [visited, setVisited] = useState<Set<string>>(() => new Set([state.activeId]));
   const toolbarRef = useRef<ToolbarHandle>(null);
+  const [frameHistory, setFrameHistory] = useState(EMPTY_FRAME_HISTORY);
+  // Back/forward traversals Fern started, so the resulting frame load is not mistaken for a new link click.
+  const pendingTraversals = useRef<{ key: string; at: number }[]>([]);
 
   const activeTab = state.tabs.find((t) => t.id === state.activeId) ?? state.tabs[0];
   const activeUrl = currentUrl(activeTab);
   const searchTemplate = searchTemplateFor(settings.searchEngine, settings.customSearchUrl);
+  const activeKey = mountKey(activeTab);
+  const frameCanGoBack = canFrameGoBack(frameHistory, activeKey);
+  const frameCanGoForward = canFrameGoForward(frameHistory, activeKey);
 
   // Tabs restored from a previous session load lazily, when first shown.
   if (!visited.has(state.activeId)) setVisited(new Set(visited).add(state.activeId));
@@ -157,17 +182,44 @@ export default function App() {
     [searchTemplate, newTab, navigate, state.activeId],
   );
 
+  /** Steps the embedded page itself through the browser's session history. */
+  const traverseFrame = useCallback((key: string, direction: -1 | 1) => {
+    pendingTraversals.current.push({ key, at: Date.now() });
+    setFrameHistory((h) => (direction < 0 ? frameBack(h) : frameForward(h)));
+    if (direction < 0) window.history.back();
+    else window.history.forward();
+  }, []);
+
   const goBack = useCallback(() => {
+    // Links followed inside the page are undone first, like a normal browser.
+    if (frameCanGoBack) return traverseFrame(activeKey, -1);
     if (activeTab.index === 0) return;
     dispatch({ type: 'back', id: activeTab.id });
     addVisit(activeTab.history[activeTab.index - 1]);
-  }, [activeTab, addVisit]);
+  }, [frameCanGoBack, traverseFrame, activeKey, activeTab, addVisit]);
 
   const goForward = useCallback(() => {
+    if (frameCanGoForward) return traverseFrame(activeKey, 1);
     if (activeTab.index >= activeTab.history.length - 1) return;
     dispatch({ type: 'forward', id: activeTab.id });
     addVisit(activeTab.history[activeTab.index + 1]);
-  }, [activeTab, addVisit]);
+  }, [frameCanGoForward, traverseFrame, activeKey, activeTab, addVisit]);
+
+  const onFrameNavigated = useCallback((tab: Tab) => {
+    const key = mountKey(tab);
+    const now = Date.now();
+    const pending = pendingTraversals.current.filter((p) => now - p.at < TRAVERSAL_TIMEOUT_MS);
+    const match = pending.findIndex((p) => p.key === key);
+    if (match >= 0) {
+      // This load is the result of Fern's own back/forward, already reflected in frameHistory.
+      pending.splice(match, 1);
+      pendingTraversals.current = pending;
+      return;
+    }
+    pendingTraversals.current = pending;
+    setFrameHistory((h) => recordFrameNavigation(h, key));
+    dispatch({ type: 'frameNavigated', id: tab.id });
+  }, []);
 
   const reload = useCallback(
     (tab: Tab = activeTab) => {
@@ -287,6 +339,9 @@ export default function App() {
             ref={toolbarRef}
             tab={activeTab}
             bookmarked={api.isBookmarked(activeUrl)}
+            canGoBack={frameCanGoBack || activeTab.index > 0}
+            canGoForward={frameCanGoForward || activeTab.index < activeTab.history.length - 1}
+            frameDepth={frameDepth(frameHistory, activeKey)}
             onBack={goBack}
             onForward={goForward}
             onReload={() => reload()}
@@ -309,11 +364,12 @@ export default function App() {
                     <WebFrame
                       key={tab.loadId}
                       url={url}
+                      frameName={`fern-${SESSION_NONCE}-${tab.id}-${tab.loadId}`}
                       active={active}
                       checkEmbedding={settings.checkEmbedding}
                       onStatus={(status, title) => onStatus(tab, status, title)}
                       onResolvedUrl={(resolved) => dispatch({ type: 'replaceUrl', id: tab.id, url: resolved })}
-                      onFrameNavigated={() => dispatch({ type: 'frameNavigated', id: tab.id })}
+                      onFrameNavigated={() => onFrameNavigated(tab)}
                       onRetry={() => reload(tab)}
                       onNavigate={(next) => navigate(tab.id, next)}
                     />

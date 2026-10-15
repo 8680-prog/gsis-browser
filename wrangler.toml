@@ -1,0 +1,7 @@
+# Cloudflare Pages configuration (read by Pages builds from GitHub and by `wrangler pages dev`).
+# The Pages project name in the dashboard should match `name`.
+name = "fern-browser"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-10-01"
+# node:dns (resolve4/resolve6 over DNS-over-HTTPS) is used by functions/api/inspect.ts.
+compatibility_flags = ["nodejs_compat"]

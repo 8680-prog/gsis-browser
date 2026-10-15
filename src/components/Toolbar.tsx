@@ -11,6 +11,10 @@ export interface ToolbarHandle {
 interface Props {
   tab: Tab;
   bookmarked: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  /** Links followed inside the embedded page since Fern opened it. */
+  frameDepth: number;
   onBack: () => void;
   onForward: () => void;
   onReload: () => void;
@@ -21,7 +25,7 @@ interface Props {
 }
 
 export const Toolbar = forwardRef<ToolbarHandle, Props>(function Toolbar(
-  { tab, bookmarked, onBack, onForward, onReload, onHome, onSubmit, onToggleBookmark, onOpenExternal },
+  { tab, bookmarked, canGoBack, canGoForward, frameDepth, onBack, onForward, onReload, onHome, onSubmit, onToggleBookmark, onOpenExternal },
   ref,
 ) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,14 +50,14 @@ export const Toolbar = forwardRef<ToolbarHandle, Props>(function Toolbar(
   return (
     <div className="toolbar">
       <div className="nav-buttons">
-        <button type="button" className="icon-btn" onClick={onBack} disabled={tab.index === 0} aria-label="Back" title="Back (Alt+Left)" data-testid="back">
+        <button type="button" className="icon-btn" onClick={onBack} disabled={!canGoBack} aria-label="Back" title="Back (Alt+Left)" data-testid="back">
           <Icon name="back" />
         </button>
         <button
           type="button"
           className="icon-btn"
           onClick={onForward}
-          disabled={tab.index >= tab.history.length - 1}
+          disabled={!canGoForward}
           aria-label="Forward"
           title="Forward (Alt+Right)"
           data-testid="forward"
@@ -103,10 +107,11 @@ export const Toolbar = forwardRef<ToolbarHandle, Props>(function Toolbar(
           }}
         />
         {busy && <span className="address-busy" aria-hidden="true" />}
-        {tab.inFrameNavigations > 0 && isWeb && (
+        {frameDepth > 0 && isWeb && (
           <span
             className="address-hint"
-            title="You followed links inside this page. Browsers do not let Fern read the address of another site's page, so the bar shows the last address opened from Fern."
+            data-testid="frame-depth-hint"
+            title={`You followed ${frameDepth === 1 ? 'a link' : `${frameDepth} links`} inside this page. Browsers do not let Fern read another site's address, so the bar shows the page Fern opened. Back steps back inside the page; Reload returns to the address shown.`}
           >
             <Icon name="info" size={14} />
           </span>

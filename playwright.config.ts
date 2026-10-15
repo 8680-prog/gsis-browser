@@ -15,7 +15,7 @@ export default defineConfig({
     },
   },
   webServer: [
-    { command: 'node tests/e2e/fixtures.mjs', port: 4101, reuseExistingServer: true },
+    { command: 'node tests/e2e/fixtures.mjs', port: 4101, reuseExistingServer: false },
     {
       command: 'npx vite build && npx vite preview --config vite.e2e.config.ts --port 4173 --strictPort',
       url: 'http://localhost:4173',

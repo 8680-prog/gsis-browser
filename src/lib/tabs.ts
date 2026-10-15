@@ -23,7 +23,7 @@ export type TabsAction =
 const MAX_TAB_HISTORY = 50;
 
 export function createTab(url: string): Tab {
-  return { id: createId('tab'), history: [url], index: 0, title: '', status: 'idle', loadId: 0, inFrameNavigations: 0 };
+  return { id: createId('tab'), history: [url], index: 0, title: '', status: 'idle', loadId: 0 };
 }
 
 export function currentUrl(tab: Tab): string {
@@ -41,7 +41,7 @@ function updateTab(state: TabsState, id: string, fn: (tab: Tab) => Tab): TabsSta
   return changed ? { ...state, tabs } : state;
 }
 
-const PAGE_RESET: Pick<Tab, 'title' | 'status' | 'inFrameNavigations'> = { title: '', status: 'idle', inFrameNavigations: 0 };
+const PAGE_RESET: Pick<Tab, 'title' | 'status'> = { title: '', status: 'idle' };
 
 /** Starts a fresh page load in the tab (new loadId remounts the page view). */
 function load(tab: Tab, changes: Partial<Tab>): Tab {
@@ -88,6 +88,8 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
     }
     case 'navigate':
       return updateTab(state, action.id, (tab) => {
+        // Re-entering the current address reloads it instead of stacking a duplicate entry.
+        if (currentUrl(tab) === action.url) return load(tab, {});
         const history = [...tab.history.slice(0, tab.index + 1), action.url].slice(-MAX_TAB_HISTORY);
         return load(tab, { history, index: history.length - 1 });
       });
@@ -115,7 +117,10 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         return title === tab.title && status === tab.status ? tab : { ...tab, title, status };
       });
     case 'frameNavigated':
-      return updateTab(state, action.id, (tab) => ({ ...tab, inFrameNavigations: tab.inFrameNavigations + 1 }));
+      // Following a link inside the page drops Fern's forward entries, like a browser.
+      return updateTab(state, action.id, (tab) =>
+        tab.index < tab.history.length - 1 ? { ...tab, history: tab.history.slice(0, tab.index + 1) } : tab,
+      );
     default:
       return state;
   }
@@ -142,7 +147,6 @@ export function restoreSession(raw: unknown, fallbackUrl: string): TabsState {
         title: typeof t.title === 'string' ? t.title : '',
         status: 'idle' as const,
         loadId: 0,
-        inFrameNavigations: 0,
       };
     })
     .filter((t) => t.history.length > 0);

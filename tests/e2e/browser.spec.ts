@@ -157,14 +157,86 @@ test('back, forward and reload', async ({ page }) => {
   await expect(frame(page).locator('h1')).toHaveText('Another embeddable site');
   await expect(page.getByTestId('forward')).toBeDisabled();
 
-  // Following a link inside the embedded page is detected (address unknown cross-origin).
+});
+
+test('Back and Forward step through links followed inside an embedded page', async ({ page }) => {
+  await go(page, OK);
+  await expect(frame(page).locator('h1')).toHaveText('Embeddable fixture page');
+  await frame(page).locator('#next').click();
+  await expect(frame(page).locator('h1')).toHaveText('Second fixture page');
+  await frame(page).locator('#next').click();
+  await expect(frame(page).locator('h1')).toHaveText('Third fixture page');
+  await expect(page.getByTestId('frame-depth-hint')).toBeVisible();
+
+  // Back undoes in-page links one at a time instead of leaving the site.
   await page.getByTestId('back').click();
+  await expect(frame(page).locator('h1')).toHaveText('Second fixture page');
+  await expect(page.getByTestId('forward')).toBeEnabled();
+  await page.getByTestId('back').click();
+  await expect(frame(page).locator('h1')).toHaveText('Embeddable fixture page');
+  await expect(page.getByTestId('frame-depth-hint')).toHaveCount(0);
+
+  // Forward redoes them.
+  await page.getByTestId('forward').click();
+  await expect(frame(page).locator('h1')).toHaveText('Second fixture page');
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect(frame(page).locator('h1')).toHaveText('Embeddable fixture page');
+
+  // Once the page is back where Fern opened it, Back continues with the tab's own history.
   await page.getByTestId('back').click();
   await expect(page.getByTestId('page-home')).toBeVisible();
+  await expect(page.getByTestId('back')).toBeDisabled();
+  await page.getByTestId('forward').click();
+  await expect(page.getByTestId('address')).toHaveValue(OK);
+  await expect(frame(page).locator('h1')).toHaveText('Embeddable fixture page');
+});
+
+test('Back stays correct after a Fern navigation and across tabs', async ({ page }) => {
+  // Links in a page that Fern later replaced must not be "undone" in the new page.
   await go(page, OK);
   await frame(page).locator('#next').click();
   await expect(frame(page).locator('h1')).toHaveText('Second fixture page');
-  await expect(page.locator('.address-hint')).toBeVisible();
+  await go(page, 'http://other-ok.test:4101/');
+  await expect(frame(page).locator('h1')).toHaveText('Another embeddable site');
+  await frame(page).locator('#next').click();
+  await expect(frame(page).locator('h1')).toHaveText('Other site page B');
+  await page.getByTestId('back').click();
+  await expect(frame(page).locator('h1')).toHaveText('Another embeddable site');
+  await page.getByTestId('back').click();
+  await expect(page.getByTestId('address')).toHaveValue(OK);
+  await expect(frame(page).locator('h1')).toHaveText('Embeddable fixture page');
+
+  // Tab 1 follows a link, then tab 2 follows a link. Back in tab 1 must not move tab 2.
+  await frame(page).locator('#next').click();
+  await expect(frame(page).locator('h1')).toHaveText('Second fixture page');
+  await page.getByTestId('new-tab').click();
+  await go(page, 'http://other-ok.test:4101/');
+  await frame(page).locator('#next').click();
+  await expect(frame(page).locator('h1')).toHaveText('Other site page B');
+  await page.getByTestId('tab').nth(0).click();
+  await page.getByTestId('back').click();
+  // Falls back to tab 1's own history (reload of the page Fern opened is not involved).
+  await expect(page.getByTestId('page-home')).toBeVisible();
+  await page.getByTestId('tab').nth(1).click();
+  await expect(frame(page).locator('h1')).toHaveText('Other site page B');
+});
+
+test('re-entering the current address reloads without a duplicate history entry', async ({ page }) => {
+  await go(page, 'http://other-ok.test:4101/');
+  await expect(frame(page).locator('h1')).toHaveText('Another embeddable site');
+  await go(page, 'http://other-ok.test:4101/');
+  await expect(frame(page).locator('h1')).toHaveText('Another embeddable site');
+  await page.getByTestId('back').click();
+  await expect(page.getByTestId('page-home')).toBeVisible();
+});
+
+test('without the embed-check backend (static hosting) pages still load with an honest notice', async ({ page }) => {
+  // Simulates GitHub Pages and similar hosts, where /api/inspect does not exist.
+  await page.route('**/api/inspect**', (route) => route.fulfill({ status: 404, contentType: 'text/html', body: '<h1>Not found</h1>' }));
+  await go(page, 'http://other-ok.test:4101/?static=1');
+  await expect(page.getByTestId('frame-notice')).toContainText('embed check service is not available');
+  await expect(page.getByTestId('frame-notice')).toContainText('site probably forbids embedding');
+  await expect(frame(page).locator('h1')).toHaveText('Another embeddable site');
 });
 
 test('bookmarks, theme, history and open tabs persist across a refresh', async ({ page }) => {

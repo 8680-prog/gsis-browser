@@ -1,6 +1,5 @@
 import { promises as dns, type LookupAddress } from 'node:dns';
 import type { LookupFunction } from 'node:net';
-import ipaddr from 'ipaddr.js';
 
 /**
  * Network guards that stop the inspector from being used to reach private,
@@ -9,34 +8,10 @@ import ipaddr from 'ipaddr.js';
 
 export type Resolver = (hostname: string) => Promise<LookupAddress[]>;
 
+export { isPublicAddress, isPublicHostname } from './addressPolicy.js';
+
 export class BlockedTargetError extends Error {
   readonly code = 'EBLOCKED';
-}
-
-/** True only for globally routable unicast addresses. */
-export function isPublicAddress(ip: string): boolean {
-  if (!ipaddr.isValid(ip)) return false;
-  let addr = ipaddr.parse(ip);
-  if (addr.kind() === 'ipv6') {
-    const v6 = addr as ipaddr.IPv6;
-    if (v6.isIPv4MappedAddress()) addr = v6.toIPv4Address();
-  }
-  // Everything ipaddr.js classifies as special (private, loopback, linkLocal,
-  // carrierGradeNat, uniqueLocal, multicast, reserved, 6to4, teredo, NAT64,
-  // ...) is rejected. 169.254.169.254 and fd00:ec2::254 fall in those ranges.
-  return addr.range() === 'unicast';
-}
-
-const BLOCKED_SUFFIXES = ['.localhost', '.local', '.internal', '.intranet', '.lan', '.home.arpa', '.test', '.invalid'];
-
-/** Rejects names that can only refer to local or internal infrastructure. */
-export function isPublicHostname(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/\.$/, '');
-  if (!host || host === 'localhost') return false;
-  if (BLOCKED_SUFFIXES.some((suffix) => host.endsWith(suffix))) return false;
-  // Single-label names ("intranet", "router") resolve via local search domains.
-  if (!host.includes('.') && !ipaddr.isValid(host)) return false;
-  return true;
 }
 
 export const systemResolver: Resolver = (hostname) =>

@@ -22,11 +22,13 @@ http
 
     switch (host) {
       case 'frame-ok.test':
-        if (url.pathname === '/page2') return send(200, {}, page('Second Page', '<h1>Second fixture page</h1>'));
+        if (url.pathname === '/page2') return send(200, {}, page('Second Page', '<h1>Second fixture page</h1><a id="next" href="/page3">Go to page 3</a>'));
+        if (url.pathname === '/page3') return send(200, {}, page('Third Page', '<h1>Third fixture page</h1>'));
         if (url.pathname === '/counter') return send(200, {}, page('Counter', `<h1 id="count">Load #${counters.get(key)}</h1>`));
         return send(200, {}, page('Frame OK Fixture', '<h1>Embeddable fixture page</h1><a id="next" href="/page2">Go to page 2</a>'));
       case 'other-ok.test':
-        return send(200, {}, page('Other Site', '<h1>Another embeddable site</h1>'));
+        if (url.pathname === '/b') return send(200, {}, page('Other B', '<h1>Other site page B</h1>'));
+        return send(200, {}, page('Other Site', '<h1>Another embeddable site</h1><a id="next" href="/b">Go to B</a>'));
       case 'frame-xfo.test':
         return send(200, { 'x-frame-options': 'DENY' }, page('XFO Fixture', '<h1>SECRET XFO CONTENT</h1>'));
       case 'frame-csp.test':

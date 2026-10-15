@@ -1,0 +1,6 @@
+# Security headers for Fern's static files on Cloudflare Pages.
+# (Pages Functions responses are not affected; /api/inspect sets its own headers.)
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src https: http:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

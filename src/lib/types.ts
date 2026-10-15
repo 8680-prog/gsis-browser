@@ -13,8 +13,6 @@ export interface Tab {
   status: LoadStatus;
   /** Incremented on every navigation or reload; remounts the page view. */
   loadId: number;
-  /** Navigations that happened inside the embedded page (not observable cross-origin). */
-  inFrameNavigations: number;
 }
 
 export type ThemeId = 'fern' | 'midnight' | 'ember' | 'light';

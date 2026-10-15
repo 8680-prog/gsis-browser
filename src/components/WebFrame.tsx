@@ -14,6 +14,12 @@ type Phase =
 
 interface Props {
   url: string;
+  /**
+   * Unique per iframe mount. Browsers match session-history entries to frames
+   * by name, so a unique name stops entries left by an earlier mount from ever
+   * being applied to this one.
+   */
+  frameName: string;
   active: boolean;
   checkEmbedding: boolean;
   onStatus: (status: LoadStatus, title?: string) => void;
@@ -63,7 +69,7 @@ const NOTE_TEXT: Record<InspectNote, string> = {
   insecure: 'This page uses an unencrypted http connection.',
 };
 
-export function WebFrame({ url, active, checkEmbedding, onStatus, onResolvedUrl, onFrameNavigated, onRetry, onNavigate }: Props) {
+export function WebFrame({ url, frameName, active, checkEmbedding, onStatus, onResolvedUrl, onFrameNavigated, onRetry, onNavigate }: Props) {
   const [phase, setPhase] = useState<Phase>(() =>
     checkEmbedding ? { kind: 'checking' } : { kind: 'frame', src: url, notes: [], unverified: 'Embed checking is turned off in Settings.' },
   );
@@ -233,6 +239,7 @@ export function WebFrame({ url, active, checkEmbedding, onStatus, onResolvedUrl,
       <iframe
         className="web-frame"
         src={phase.src}
+        name={frameName}
         title={`Web page: ${displayHost(phase.src)}`}
         data-testid="web-frame"
         // No allow-top-navigation: embedded pages cannot navigate Fern itself away.
